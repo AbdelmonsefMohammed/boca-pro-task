@@ -41,7 +41,7 @@ test('it stores the grant when the user consents', function (): void {
     ]));
 
     $this->actingAs($this->user)->get(route('google.callback'))
-        ->assertRedirect(route('google.connection'));
+        ->assertRedirect(route('calendar.edit'));
 
     $account = $this->user->fresh()->googleAccount;
 

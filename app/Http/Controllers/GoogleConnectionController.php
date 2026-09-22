@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Google\ConnectGoogleAccount;
 use App\Exceptions\MissingRefreshToken;
+use App\Services\Calendar\CalendarDirectory;
 use App\Services\Calendar\GoogleTokenRevoker;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -58,7 +59,7 @@ class GoogleConnectionController extends Controller
     /**
      * Receive the consent result and store the grant.
      */
-    public function store(Request $request, ConnectGoogleAccount $connect): RedirectResponse
+    public function store(Request $request, ConnectGoogleAccount $connect, CalendarDirectory $directory): RedirectResponse
     {
         if ($request->has('error')) {
             return $this->failWith(__('Google access was not granted, so no calendar is connected.'));
@@ -75,20 +76,22 @@ class GoogleConnectionController extends Controller
         }
 
         try {
-            $connect->handle($request->user(), $googleUser);
+            $account = $connect->handle($request->user(), $googleUser);
         } catch (MissingRefreshToken) {
             return $this->failWith(__('Google did not return a refresh token. Remove this app under your Google account permissions, then connect again.'));
         }
 
+        $directory->forget($account);
+
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Google account connected.')]);
 
-        return to_route('google.connection');
+        return to_route('calendar.edit');
     }
 
     /**
      * Revoke the grant with Google and forget it locally.
      */
-    public function destroy(Request $request, GoogleTokenRevoker $revoker): RedirectResponse
+    public function destroy(Request $request, GoogleTokenRevoker $revoker, CalendarDirectory $directory): RedirectResponse
     {
         $account = $request->user()->googleAccount;
 
@@ -97,6 +100,8 @@ class GoogleConnectionController extends Controller
         }
 
         $revoker->revoke($account);
+
+        $directory->forget($account);
 
         $account->delete();
 

@@ -1,0 +1,173 @@
+<?php
+
+use App\Data\Calendar;
+use App\Exceptions\CalendarAuthExpired;
+use App\Exceptions\CalendarUnavailable;
+use App\Models\GoogleAccount;
+use App\Models\User;
+use App\Services\Calendar\CalendarProvider;
+use App\Services\Calendar\FakeCalendarProvider;
+use Illuminate\Support\Collection;
+use Laravel\Socialite\Socialite;
+use Laravel\Socialite\Two\User as SocialiteUser;
+
+beforeEach(function (): void {
+    $this->calendars = new FakeCalendarProvider;
+    $this->app->instance(CalendarProvider::class, $this->calendars);
+
+    $this->user = User::factory()->create();
+    $this->account = GoogleAccount::factory()->for($this->user)->create();
+});
+
+test('it lists the calendars the connected account can book into', function (): void {
+    $this->actingAs($this->user)->get(route('calendar.edit'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('calendar/select')
+            ->where('accountEmail', $this->account->email)
+            ->where('error', null)
+            ->has('calendars', 2)
+            ->where('calendars.0.id', 'primary')
+            ->where('calendars.1.timezone', 'Europe/Amsterdam')
+        );
+});
+
+test('it persists the chosen calendar', function (): void {
+    $this->actingAs($this->user)
+        ->put(route('calendar.update'), ['calendar_id' => 'work@example.com'])
+        ->assertRedirect(route('calendar.edit'))
+        ->assertSessionHasNoErrors();
+
+    $account = $this->account->fresh();
+
+    expect($account->selected_calendar_id)->toBe('work@example.com')
+        ->and($account->selected_calendar_name)->toBe('Work')
+        ->and($account->hasSelectedCalendar())->toBeTrue();
+});
+
+test('it rejects a calendar the connected account does not have', function (): void {
+    $this->actingAs($this->user)
+        ->put(route('calendar.update'), ['calendar_id' => 'someone-elses@example.com'])
+        ->assertSessionHasErrors([
+            'calendar_id' => 'That calendar is not available on the connected Google account.',
+        ]);
+
+    expect($this->account->fresh()->selected_calendar_id)->toBeNull();
+});
+
+test('it requires a calendar id', function (): void {
+    $this->actingAs($this->user)
+        ->put(route('calendar.update'), [])
+        ->assertSessionHasErrors('calendar_id');
+});
+
+test('it renders an error state instead of failing when google is unavailable', function (): void {
+    $this->calendars->alwaysFailWith(new CalendarUnavailable('Google Calendar returned 503.'));
+
+    $this->actingAs($this->user)->get(route('calendar.edit'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('calendar/select')
+            ->has('calendars', 0)
+            ->where('error', 'Google Calendar returned 503.')
+        );
+});
+
+test('it refuses to save a selection it cannot confirm with google', function (): void {
+    $this->calendars->alwaysFailWith(new CalendarUnavailable('Google Calendar returned 503.'));
+
+    $this->actingAs($this->user)
+        ->put(route('calendar.update'), ['calendar_id' => 'primary'])
+        ->assertSessionHasErrors([
+            'calendar_id' => 'Google is unavailable, so the calendar could not be confirmed. Try again shortly.',
+        ]);
+
+    expect($this->account->fresh()->selected_calendar_id)->toBeNull();
+});
+
+test('it sends the user back to reconnect when the grant is dead', function (): void {
+    $this->calendars->alwaysFailWith(new CalendarAuthExpired('Reconnect required.'));
+
+    $this->actingAs($this->user)->get(route('calendar.edit'))
+        ->assertRedirect(route('google.connection'));
+});
+
+test('it shows an empty state when the account has no writable calendars', function (): void {
+    $this->calendars->withCalendars(collect());
+
+    $this->actingAs($this->user)->get(route('calendar.edit'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->has('calendars', 0)->where('error', null));
+});
+
+test('it sends a user with no connected account to the connect page', function (): void {
+    $this->account->delete();
+
+    $this->actingAs($this->user)->get(route('calendar.edit'))
+        ->assertRedirect(route('google.connection'));
+
+    $this->actingAs($this->user)
+        ->put(route('calendar.update'), ['calendar_id' => 'primary'])
+        ->assertRedirect(route('google.connection'));
+});
+
+test('it caches the calendar list so a refresh does not hammer google', function (): void {
+    $counting = new class extends FakeCalendarProvider
+    {
+        public int $calls = 0;
+
+        public function listCalendars(GoogleAccount $account): Collection
+        {
+            $this->calls++;
+
+            return parent::listCalendars($account);
+        }
+    };
+    $this->app->instance(CalendarProvider::class, $counting);
+
+    $this->actingAs($this->user)->get(route('calendar.edit'));
+    $this->actingAs($this->user)->get(route('calendar.edit'));
+
+    expect($counting->calls)->toBe(1);
+});
+
+test('it refreshes the cached list when a different google account is connected', function (): void {
+    $this->actingAs($this->user)->get(route('calendar.edit'))
+        ->assertInertia(fn ($page) => $page->where('calendars.0.id', 'primary'));
+
+    $this->calendars->withCalendars(collect([
+        new Calendar('other@example.com', 'Other', 'UTC', isPrimary: false, isWritable: true),
+    ]));
+
+    Socialite::fake('google', SocialiteUser::fake([
+        'email' => 'different@example.com',
+        'refreshToken' => 'refresh-123',
+    ]));
+    $this->actingAs($this->user)->get(route('google.callback'));
+
+    $this->actingAs($this->user)->get(route('calendar.edit'))
+        ->assertInertia(fn ($page) => $page
+            ->has('calendars', 1)
+            ->where('calendars.0.id', 'other@example.com')
+        );
+});
+
+test('it keeps another user from reading or setting this account calendar', function (): void {
+    $intruder = User::factory()->create();
+
+    $this->actingAs($intruder)->get(route('calendar.edit'))
+        ->assertRedirect(route('google.connection'));
+
+    $this->actingAs($intruder)
+        ->put(route('calendar.update'), ['calendar_id' => 'primary'])
+        ->assertRedirect(route('google.connection'));
+
+    expect($this->account->fresh()->selected_calendar_id)->toBeNull();
+});
+
+test('it keeps the calendar routes behind authentication', function (string $method, string $route): void {
+    $this->{$method}(route($route))->assertRedirect(route('login'));
+})->with([
+    ['get', 'calendar.edit'],
+    ['put', 'calendar.update'],
+]);
