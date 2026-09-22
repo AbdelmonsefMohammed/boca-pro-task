@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Services\Calendar\CalendarProvider;
+use App\Services\Calendar\FakeCalendarProvider;
+use App\Services\Calendar\GoogleCalendarProvider;
+use App\Services\Calendar\GoogleTokenRefresher;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +19,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(CalendarProvider::class, fn (): CalendarProvider => match (config('services.calendar.driver')) {
+            'fake' => new FakeCalendarProvider,
+            default => new GoogleCalendarProvider(new GoogleTokenRefresher),
+        });
     }
 
     /**

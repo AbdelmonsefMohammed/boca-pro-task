@@ -14,6 +14,19 @@ return [
     |
     */
 
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI'),
+    ],
+
+    'calendar' => [
+        'driver' => env('CALENDAR_DRIVER', 'google'),
+        'base_url' => env('CALENDAR_BASE_URL', 'https://www.googleapis.com/calendar/v3'),
+        'connect_timeout' => (int) env('CALENDAR_CONNECT_TIMEOUT', 5),
+        'timeout' => (int) env('CALENDAR_TIMEOUT', 10),
+    ],
+
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],
