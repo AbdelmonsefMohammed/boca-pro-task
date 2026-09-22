@@ -211,7 +211,7 @@ test('it lists bookings split into upcoming and past', function (): void {
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('appointments/index')
-            ->where('calendarName', 'Work')
+            ->where('selectedCalendarName', 'Work')
             ->has('upcoming', 1)
             ->where('upcoming.0.bookings.0.title', 'Later')
             ->has('past', 1)
@@ -262,11 +262,16 @@ test('it shows a user only their own bookings', function (): void {
         ->assertInertia(fn ($page) => $page->has('upcoming', 1)->where('upcoming.0.bookings.0.title', 'Mine'));
 });
 
-test('it sends a user with no chosen calendar to the picker', function (): void {
-    $this->account->update(['selected_calendar_id' => null]);
+test('it offers the picker in place of the form when no calendar is chosen', function (): void {
+    $this->account->update(['selected_calendar_id' => null, 'selected_calendar_name' => null]);
 
     $this->actingAs($this->user)->get(route('appointments.index'))
-        ->assertRedirect(route('calendar.edit'));
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('appointments/index')
+            ->where('selectedCalendarId', null)
+            ->has('calendars')
+        );
 });
 
 test('it keeps the booking routes behind authentication', function (string $method, string $route): void {

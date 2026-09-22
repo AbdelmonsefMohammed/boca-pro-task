@@ -11,4 +11,9 @@ class AppointmentPolicy
     {
         return $user->id === $appointment->user_id;
     }
+
+    public function sync(User $user, Appointment $appointment): bool
+    {
+        return $user->id === $appointment->user_id;
+    }
 }

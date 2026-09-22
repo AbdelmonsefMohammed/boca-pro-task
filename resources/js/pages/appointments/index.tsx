@@ -1,4 +1,7 @@
 import { Form, Head } from '@inertiajs/react';
+import { TriangleAlert } from 'lucide-react';
+import { useState } from 'react';
+import CalendarSelectionController from '@/actions/App/Http/Controllers/CalendarSelectionController';
 import AppointmentController from '@/actions/App/Http/Controllers/AppointmentController';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
@@ -6,6 +9,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 type SyncStatus = 'pending' | 'synced' | 'failed';
 
@@ -27,8 +37,19 @@ type Day = {
     bookings: Booking[];
 };
 
+type CalendarOption = {
+    id: string;
+    name: string;
+    timezone: string;
+    isPrimary: boolean;
+    isWritable: boolean;
+};
+
 type PageProps = {
-    calendarName: string;
+    calendars: CalendarOption[];
+    selectedCalendarId: string | null;
+    selectedCalendarName: string | null;
+    calendarError: string | null;
     durations: number[];
     upcoming: Day[];
     past: Day[];
@@ -37,7 +58,10 @@ type PageProps = {
 const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 export default function Appointments({
-    calendarName,
+    calendars,
+    selectedCalendarId,
+    selectedCalendarName,
+    calendarError,
     durations,
     upcoming,
     past,
@@ -49,11 +73,30 @@ export default function Appointments({
             <div className="flex h-full flex-1 flex-col gap-6 p-4">
                 <Heading
                     title="Appointments"
-                    description={`Bookings are added to ${calendarName}.`}
+                    description={
+                        selectedCalendarName
+                            ? `Bookings are added to ${selectedCalendarName}.`
+                            : 'Choose a calendar to start taking bookings.'
+                    }
                 />
 
                 <div className="grid gap-6 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
-                    <BookingForm durations={durations} />
+                    <div className="space-y-6">
+                        <CalendarPicker
+                            calendars={calendars}
+                            selectedCalendarId={selectedCalendarId}
+                            error={calendarError}
+                        />
+
+                        {selectedCalendarId ? (
+                            <BookingForm durations={durations} />
+                        ) : (
+                            <p className="rounded-xl border border-dashed border-sidebar-border/70 p-6 text-sm text-muted-foreground dark:border-sidebar-border">
+                                Pick a booking calendar above before adding an
+                                appointment.
+                            </p>
+                        )}
+                    </div>
 
                     <div className="space-y-6">
                         <BookingList title="Upcoming" days={upcoming} />
@@ -62,6 +105,84 @@ export default function Appointments({
                 </div>
             </div>
         </>
+    );
+}
+
+function CalendarPicker({
+    calendars,
+    selectedCalendarId,
+    error,
+}: {
+    calendars: CalendarOption[];
+    selectedCalendarId: string | null;
+    error: string | null;
+}) {
+    const [chosen, setChosen] = useState(selectedCalendarId ?? '');
+
+    return (
+        <div className="rounded-xl border border-sidebar-border/70 p-6 dark:border-sidebar-border">
+            <h2 className="mb-4 text-sm font-medium">Booking calendar</h2>
+
+            {error ? (
+                <div className="flex items-start gap-3">
+                    <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-500" />
+                    <p className="text-sm text-muted-foreground">{error}</p>
+                </div>
+            ) : calendars.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                    This Google account has no calendar you can add events to.
+                </p>
+            ) : (
+                <Form
+                    {...CalendarSelectionController.update.form()}
+                    options={{ preserveScroll: true }}
+                    className="space-y-4"
+                >
+                    {({ processing, errors }) => (
+                        <>
+                            <input
+                                type="hidden"
+                                name="calendar_id"
+                                value={chosen}
+                            />
+
+                            <Select value={chosen} onValueChange={setChosen}>
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Pick a calendar" />
+                                </SelectTrigger>
+
+                                <SelectContent>
+                                    {calendars.map((calendar) => (
+                                        <SelectItem
+                                            key={calendar.id}
+                                            value={calendar.id}
+                                        >
+                                            {calendar.name}
+                                            {calendar.isPrimary && ' (primary)'}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+
+                            <InputError message={errors.calendar_id} />
+
+                            <Button
+                                type="submit"
+                                variant="outline"
+                                size="sm"
+                                disabled={
+                                    processing ||
+                                    chosen === '' ||
+                                    chosen === selectedCalendarId
+                                }
+                            >
+                                Save calendar
+                            </Button>
+                        </>
+                    )}
+                </Form>
+            )}
+        </div>
     );
 }
 
@@ -249,13 +370,31 @@ function BookingRow({ booking }: { booking: Booking }) {
                 </div>
             </div>
 
-            {booking.syncStatus === 'failed' && booking.syncError && (
-                <p className="mt-3 text-sm text-amber-700 dark:text-amber-500">
-                    {booking.isCancelled
-                        ? 'Cancelled here, but may still be on Google Calendar: '
-                        : 'Not on Google Calendar: '}
-                    {booking.syncError}
-                </p>
+            {booking.syncStatus === 'failed' && (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm text-amber-700 dark:text-amber-500">
+                        {booking.isCancelled
+                            ? 'Cancelled here, but may still be on Google Calendar: '
+                            : 'Not on Google Calendar: '}
+                        {booking.syncError}
+                    </p>
+
+                    <Form
+                        {...AppointmentController.sync.form(booking.id)}
+                        options={{ preserveScroll: true }}
+                    >
+                        {({ processing }) => (
+                            <Button
+                                type="submit"
+                                variant="outline"
+                                size="sm"
+                                disabled={processing}
+                            >
+                                Retry sync
+                            </Button>
+                        )}
+                    </Form>
+                </div>
             )}
         </li>
     );

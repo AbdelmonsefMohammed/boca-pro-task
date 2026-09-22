@@ -2,7 +2,6 @@ import { Link } from '@inertiajs/react';
 import {
     BookOpen,
     CalendarCheck,
-    CalendarCog,
     FolderGit2,
     LayoutGrid,
     Link2,
@@ -22,7 +21,6 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { index as appointmentsIndex } from '@/routes/appointments';
-import { edit as calendarEdit } from '@/routes/calendar';
 import { connection } from '@/routes/google';
 import type { NavItem } from '@/types';
 
@@ -36,11 +34,6 @@ const mainNavItems: NavItem[] = [
         title: 'Appointments',
         href: appointmentsIndex(),
         icon: CalendarCheck,
-    },
-    {
-        title: 'Booking calendar',
-        href: calendarEdit(),
-        icon: CalendarCog,
     },
     {
         title: 'Google account',

@@ -85,7 +85,7 @@ class GoogleConnectionController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Google account connected.')]);
 
-        return to_route('calendar.edit');
+        return to_route('appointments.index');
     }
 
     /**

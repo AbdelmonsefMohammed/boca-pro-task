@@ -15,7 +15,6 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('google/callback', [GoogleConnectionController::class, 'store'])->name('google.callback');
     Route::delete('google', [GoogleConnectionController::class, 'destroy'])->name('google.disconnect');
 
-    Route::get('calendars', [CalendarSelectionController::class, 'edit'])->name('calendar.edit');
     Route::put('calendars/selection', [CalendarSelectionController::class, 'update'])->name('calendar.update');
 
     Route::get('appointments', [AppointmentController::class, 'index'])->name('appointments.index');
@@ -23,6 +22,9 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         ->middleware('throttle:30,1')
         ->name('appointments.store');
     Route::delete('appointments/{appointment}', [AppointmentController::class, 'destroy'])->name('appointments.destroy');
+    Route::post('appointments/{appointment}/sync', [AppointmentController::class, 'sync'])
+        ->middleware('throttle:30,1')
+        ->name('appointments.sync');
 });
 
 require __DIR__.'/settings.php';

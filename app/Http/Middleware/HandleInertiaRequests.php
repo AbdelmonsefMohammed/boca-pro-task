@@ -42,6 +42,10 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+
+            // Shared so the reconnect prompt reaches whatever page the user is on, rather
+            // than only the one they are least likely to be looking at.
+            'googleNeedsReconnect' => $request->user()?->googleAccount?->needsReconnect() ?? false,
         ];
     }
 }

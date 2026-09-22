@@ -4,9 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Actions\Appointments\CancelAppointment;
 use App\Actions\Appointments\CreateAppointment;
+use App\Data\Calendar;
+use App\Enums\SyncStatus;
+use App\Exceptions\CalendarAuthExpired;
+use App\Exceptions\CalendarUnavailable;
 use App\Exceptions\SlotAlreadyBooked;
 use App\Http\Requests\StoreAppointmentRequest;
+use App\Jobs\RemoveAppointmentFromCalendar;
+use App\Jobs\SyncAppointmentToCalendar;
 use App\Models\Appointment;
+use App\Services\Calendar\CalendarDirectory;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,7 +27,7 @@ class AppointmentController extends Controller
     /**
      * List the signed in user's bookings, split into upcoming and past.
      */
-    public function index(Request $request): Response|RedirectResponse
+    public function index(Request $request, CalendarDirectory $directory): Response|RedirectResponse
     {
         $account = $request->user()->googleAccount;
 
@@ -28,14 +35,26 @@ class AppointmentController extends Controller
             return to_route('google.connection');
         }
 
-        if (! $account->hasSelectedCalendar()) {
-            return to_route('calendar.edit');
-        }
-
         $appointments = $request->user()->appointments()->orderBy('starts_at')->get();
 
+        // The calendar list needs Google; the bookings do not. Failing softly here is what
+        // keeps an outage from taking down the page that shows bookings already made.
+        $calendars = collect();
+        $calendarError = null;
+
+        try {
+            $calendars = $directory->for($account);
+        } catch (CalendarAuthExpired) {
+            $calendarError = __('Google revoked access. Reconnect the account to change calendars.');
+        } catch (CalendarUnavailable $exception) {
+            $calendarError = $exception->getMessage();
+        }
+
         return Inertia::render('appointments/index', [
-            'calendarName' => $account->selected_calendar_name,
+            'calendars' => $calendars->map(fn (Calendar $calendar): array => $calendar->toArray())->all(),
+            'selectedCalendarId' => $account->selected_calendar_id,
+            'selectedCalendarName' => $account->selected_calendar_name,
+            'calendarError' => $calendarError,
             'durations' => StoreAppointmentRequest::$durations,
             'upcoming' => $this->present($appointments->filter(fn (Appointment $appointment): bool => $appointment->ends_at->isFuture())),
             'past' => $this->present($appointments->filter(fn (Appointment $appointment): bool => $appointment->ends_at->isPast())->reverse()),
@@ -79,6 +98,32 @@ class AppointmentController extends Controller
         $cancelAppointment->handle($appointment);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Appointment cancelled.')]);
+
+        return to_route('appointments.index');
+    }
+
+    /**
+     * Try a failed sync again.
+     *
+     * Which job to run depends on what the booking now is: a cancelled one needs
+     * removing from the calendar, a live one needs writing to it. Retrying the wrong
+     * direction would push a cancelled booking back onto the calendar.
+     */
+    public function sync(Request $request, Appointment $appointment): RedirectResponse
+    {
+        Gate::authorize('sync', $appointment);
+
+        if ($appointment->sync_status !== SyncStatus::Failed) {
+            return to_route('appointments.index');
+        }
+
+        $appointment->update(['sync_status' => SyncStatus::Pending, 'sync_error' => null]);
+
+        $appointment->isCancelled()
+            ? RemoveAppointmentFromCalendar::dispatch($appointment)
+            : SyncAppointmentToCalendar::dispatch($appointment);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Retrying the calendar sync.')]);
 
         return to_route('appointments.index');
     }
