@@ -202,7 +202,11 @@ function BookingList({ title, days }: { title: string; days: Day[] }) {
 
 function BookingRow({ booking }: { booking: Booking }) {
     return (
-        <li className="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border">
+        <li
+            className={`rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border ${
+                booking.isCancelled ? 'opacity-60' : ''
+            }`}
+        >
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex items-start gap-4">
                     <p className="w-28 shrink-0 font-mono text-sm tabular-nums">
@@ -219,19 +223,55 @@ function BookingRow({ booking }: { booking: Booking }) {
                     </div>
                 </div>
 
-                <SyncBadge status={booking.syncStatus} />
+                <div className="flex items-center gap-2">
+                    <SyncBadge
+                        status={booking.syncStatus}
+                        isCancelled={booking.isCancelled}
+                    />
+
+                    {!booking.isCancelled && (
+                        <Form
+                            {...AppointmentController.destroy.form(booking.id)}
+                            options={{ preserveScroll: true }}
+                        >
+                            {({ processing }) => (
+                                <Button
+                                    type="submit"
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={processing}
+                                >
+                                    Cancel
+                                </Button>
+                            )}
+                        </Form>
+                    )}
+                </div>
             </div>
 
             {booking.syncStatus === 'failed' && booking.syncError && (
                 <p className="mt-3 text-sm text-amber-700 dark:text-amber-500">
-                    Not on Google Calendar: {booking.syncError}
+                    {booking.isCancelled
+                        ? 'Cancelled here, but may still be on Google Calendar: '
+                        : 'Not on Google Calendar: '}
+                    {booking.syncError}
                 </p>
             )}
         </li>
     );
 }
 
-function SyncBadge({ status }: { status: SyncStatus }) {
+function SyncBadge({
+    status,
+    isCancelled,
+}: {
+    status: SyncStatus;
+    isCancelled: boolean;
+}) {
+    if (isCancelled) {
+        return <Badge variant="outline">Cancelled</Badge>;
+    }
+
     const label = {
         pending: 'Syncing',
         synced: 'On Google Calendar',

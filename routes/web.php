@@ -22,6 +22,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::post('appointments', [AppointmentController::class, 'store'])
         ->middleware('throttle:30,1')
         ->name('appointments.store');
+    Route::delete('appointments/{appointment}', [AppointmentController::class, 'destroy'])->name('appointments.destroy');
 });
 
 require __DIR__.'/settings.php';

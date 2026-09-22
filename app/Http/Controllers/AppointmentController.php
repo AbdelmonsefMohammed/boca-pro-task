@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Appointments\CancelAppointment;
 use App\Actions\Appointments\CreateAppointment;
 use App\Exceptions\SlotAlreadyBooked;
 use App\Http\Requests\StoreAppointmentRequest;
@@ -9,6 +10,7 @@ use App\Models\Appointment;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -63,6 +65,20 @@ class AppointmentController extends Controller
         }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Appointment booked.')]);
+
+        return to_route('appointments.index');
+    }
+
+    /**
+     * Cancel a booking, which frees the slot and pulls the event from the calendar.
+     */
+    public function destroy(Request $request, Appointment $appointment, CancelAppointment $cancelAppointment): RedirectResponse
+    {
+        Gate::authorize('delete', $appointment);
+
+        $cancelAppointment->handle($appointment);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Appointment cancelled.')]);
 
         return to_route('appointments.index');
     }

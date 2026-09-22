@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use App\Enums\SyncStatus;
+use App\Policies\AppointmentPolicy;
 use Carbon\CarbonImmutable;
 use Database\Factories\AppointmentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Attributes\UsePolicy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -45,6 +47,7 @@ use Illuminate\Support\Str;
     'sync_status',
     'sync_error',
 ])]
+#[UsePolicy(AppointmentPolicy::class)]
 class Appointment extends Model
 {
     /** @use HasFactory<AppointmentFactory> */
