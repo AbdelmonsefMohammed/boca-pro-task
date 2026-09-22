@@ -29,6 +29,23 @@ readonly class Calendar
     }
 
     /**
+     * Rebuild from the primitive form. Caching the array rather than the object means a
+     * rename or a namespace move cannot leave unreadable entries behind for a whole TTL.
+     *
+     * @param  array{id: string, name: string, timezone: string, isPrimary: bool, isWritable: bool}  $data
+     */
+    public static function fromArray(array $data): self
+    {
+        return new self(
+            id: $data['id'],
+            name: $data['name'],
+            timezone: $data['timezone'],
+            isPrimary: $data['isPrimary'],
+            isWritable: $data['isWritable'],
+        );
+    }
+
+    /**
      * @return array{id: string, name: string, timezone: string, isPrimary: bool, isWritable: bool}
      */
     public function toArray(): array

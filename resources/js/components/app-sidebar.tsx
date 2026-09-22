@@ -1,5 +1,12 @@
 import { Link } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid } from 'lucide-react';
+import {
+    BookOpen,
+    CalendarCheck,
+    CalendarCog,
+    FolderGit2,
+    LayoutGrid,
+    Link2,
+} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -14,6 +21,9 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { index as appointmentsIndex } from '@/routes/appointments';
+import { edit as calendarEdit } from '@/routes/calendar';
+import { connection } from '@/routes/google';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
@@ -21,6 +31,21 @@ const mainNavItems: NavItem[] = [
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutGrid,
+    },
+    {
+        title: 'Appointments',
+        href: appointmentsIndex(),
+        icon: CalendarCheck,
+    },
+    {
+        title: 'Booking calendar',
+        href: calendarEdit(),
+        icon: CalendarCog,
+    },
+    {
+        title: 'Google account',
+        href: connection(),
+        icon: Link2,
     },
 ];
 

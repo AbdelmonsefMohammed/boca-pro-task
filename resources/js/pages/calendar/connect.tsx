@@ -1,4 +1,4 @@
-import { Form, Head, Link } from '@inertiajs/react';
+import { Form, Head } from '@inertiajs/react';
 import { CalendarCheck, CalendarX, TriangleAlert } from 'lucide-react';
 import GoogleConnectionController from '@/actions/App/Http/Controllers/GoogleConnectionController';
 import Heading from '@/components/heading';
@@ -16,6 +16,11 @@ type PageProps = {
     connection: Connection | null;
 };
 
+/**
+ * The connect links are plain anchors, not Inertia links. Inertia visits are XHR, and
+ * an XHR cannot follow the redirect to accounts.google.com: the browser blocks it as a
+ * cross origin request. OAuth needs a real top level navigation.
+ */
 export default function Connect({ connection }: PageProps) {
     return (
         <>
@@ -54,7 +59,7 @@ function NotConnected() {
             </div>
 
             <Button asChild>
-                <Link href={connect()}>Connect Google account</Link>
+                <a href={connect.url()}>Connect Google account</a>
             </Button>
         </div>
     );
@@ -90,11 +95,11 @@ function Connected({ connection }: { connection: Connection }) {
                     asChild
                     variant={connection.needsReconnect ? 'default' : 'outline'}
                 >
-                    <Link href={connect()}>
+                    <a href={connect.url()}>
                         {connection.needsReconnect
                             ? 'Reconnect'
                             : 'Reconnect a different account'}
-                    </Link>
+                    </a>
                 </Button>
 
                 <Form {...GoogleConnectionController.destroy.form()}>

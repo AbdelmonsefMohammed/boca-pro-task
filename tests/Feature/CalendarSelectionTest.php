@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\Calendar\CalendarProvider;
 use App\Services\Calendar\FakeCalendarProvider;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Laravel\Socialite\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 
@@ -150,6 +151,24 @@ test('it refreshes the cached list when a different google account is connected'
             ->has('calendars', 1)
             ->where('calendars.0.id', 'other@example.com')
         );
+});
+
+test('it caches calendars in a form that survives a serializing cache store', function (): void {
+    // The array store never serializes, so it hides the failure the database and redis
+    // stores hit: a cached object whose class has since moved comes back unreadable.
+    config(['cache.default' => 'database']);
+
+    $this->actingAs($this->user)->get(route('calendar.edit'))->assertOk();
+
+    $cached = Cache::store('database')->get('google-calendars:v1:'.$this->account->id);
+
+    expect($cached)->toBeArray()
+        ->and($cached[0])->toBeArray()
+        ->and($cached[0]['id'])->toBe('primary');
+
+    $this->actingAs($this->user)->get(route('calendar.edit'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('calendars.0.id', 'primary'));
 });
 
 test('it keeps another user from reading or setting this account calendar', function (): void {

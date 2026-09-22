@@ -23,11 +23,16 @@ class CalendarDirectory
      */
     public function for(GoogleAccount $account): Collection
     {
-        return Cache::remember(
+        /** @var list<array{id: string, name: string, timezone: string, isPrimary: bool, isWritable: bool}> $cached */
+        $cached = Cache::remember(
             $this->cacheKey($account),
             now()->addMinute(),
-            fn (): Collection => $this->provider->listCalendars($account),
+            fn (): array => $this->provider->listCalendars($account)
+                ->map(fn (Calendar $calendar): array => $calendar->toArray())
+                ->all(),
         );
+
+        return collect($cached)->map(fn (array $entry): Calendar => Calendar::fromArray($entry));
     }
 
     /**
@@ -48,8 +53,12 @@ class CalendarDirectory
         Cache::forget($this->cacheKey($account));
     }
 
+    /**
+     * The version segment lets the cached shape change without leaving entries behind
+     * that the new code cannot read.
+     */
     private function cacheKey(GoogleAccount $account): string
     {
-        return "google-calendars:{$account->id}";
+        return "google-calendars:v1:{$account->id}";
     }
 }

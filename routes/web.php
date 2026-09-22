@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\CalendarSelectionController;
 use App\Http\Controllers\GoogleConnectionController;
 use Illuminate\Support\Facades\Route;
@@ -16,6 +17,11 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 
     Route::get('calendars', [CalendarSelectionController::class, 'edit'])->name('calendar.edit');
     Route::put('calendars/selection', [CalendarSelectionController::class, 'update'])->name('calendar.update');
+
+    Route::get('appointments', [AppointmentController::class, 'index'])->name('appointments.index');
+    Route::post('appointments', [AppointmentController::class, 'store'])
+        ->middleware('throttle:30,1')
+        ->name('appointments.store');
 });
 
 require __DIR__.'/settings.php';
