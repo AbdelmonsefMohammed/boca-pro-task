@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Fortify\Features;
 
-test('security page is displayed', function () {
+test('security page is displayed', function (): void {
     $this->skipUnlessFortifyHas(Features::twoFactorAuthentication());
 
     Features::twoFactorAuthentication([
@@ -24,7 +24,7 @@ test('security page is displayed', function () {
         );
 });
 
-test('security page renders without two factor when feature is disabled', function () {
+test('security page renders without two factor when feature is disabled', function (): void {
     $this->skipUnlessFortifyHas(Features::twoFactorAuthentication());
 
     config(['fortify.features' => []]);
@@ -42,7 +42,7 @@ test('security page renders without two factor when feature is disabled', functi
         );
 });
 
-test('password can be updated', function () {
+test('password can be updated', function (): void {
     $user = User::factory()->create();
 
     $response = $this
@@ -61,7 +61,7 @@ test('password can be updated', function () {
     expect(Hash::check('new-password', $user->refresh()->password))->toBeTrue();
 });
 
-test('correct password must be provided to update password', function () {
+test('correct password must be provided to update password', function (): void {
     $user = User::factory()->create();
 
     $response = $this

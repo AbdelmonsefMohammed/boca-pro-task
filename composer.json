@@ -14,6 +14,7 @@
         "laravel/chisel": "^0.1.0",
         "laravel/fortify": "^1.37.2",
         "laravel/framework": "^13.17",
+        "laravel/socialite": "^5.31",
         "laravel/tinker": "^3.0",
         "laravel/wayfinder": "^0.1.14"
     },
@@ -22,7 +23,7 @@
         "larastan/larastan": "^3.9",
         "laravel/boost": "^2.2",
         "laravel/pail": "^1.2.5",
-        "laravel/pao": "^1.0.6",
+        "laravel/pao": "^1.1",
         "laravel/pint": "^1.27",
         "laravel/sail": "^1.53",
         "mockery/mockery": "^1.6",
@@ -97,6 +98,15 @@
         ],
         "pre-package-uninstall": [
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
+        ],
+        "test:rector": "./vendor/bin/rector process --dry-run --xdebug",
+        "test:unit-fast": "vendor/bin/pest --parallel",
+        "test:phpstan": "vendor/bin/phpstan analyse",
+        "test-local": [
+            "@test:rector",
+            "@lint:check",
+            "@test:phpstan",
+            "@test:unit-fast"
         ]
     },
     "extra": {
